@@ -15,48 +15,57 @@ export default function Home() {
   );
 
   const filteredSubcategories = subcategories.filter(sub =>
-    sub.toLowerCase().includes("kontenery") ||
-    sub.toLowerCase().includes("zbiorniki")
+    sub.toLowerCase().includes("zbiorniki") &&
+    (sub.toLowerCase().includes("diesel") ||
+    sub.toLowerCase().includes("adblue"))
   );
 
-  const [category, setCategory] = useState(filteredSubcategories[0]);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("Wszystkie");
+  const [selectedMobility, setSelectedMobility] = useState<string | null>(null);
+
+  const filteredProducts = produkty.filter(p => {
+    const isSubcategoryMatch = selectedCategory === "Wszystkie" || p.subcategory === selectedCategory;
+    const isMobilityMatch = selectedMobility === "mobilne" ? p.code.includes("TT") : !p.code.includes("TT");
+    return typeof p.subcategory === 'string' && filteredSubcategories.includes(p.subcategory) && isSubcategoryMatch && isMobilityMatch;
+  });
 
   return (
     <div className="min-h-screen bg-linear-to-b from-white via-sky-300 to-sky-800">
-      <div className="max-w-7xl w-full min-h-200 bg-white px-10 pt-5 pb-10 relative mx-auto top-10">
-        <select className="mb-5 p-2 border-2 border-sky-600 rounded mx-auto block">
-          {filteredSubcategories.map((subcategory, index) => {
-            const items = produkty.filter(p => p.subcategory === subcategory);
-            return (
-              <option key={index} value={subcategory} onClick={() => setCategory(subcategory)}>
-                {subcategory}
-              </option>
-            );
-          })}
-        </select>
-
+      <div className="max-w-7xl w-full min-h-170 bg-white px-10 pt-5 pb-10 relative mx-auto top-0 flex">
+        <div className="mx-4">
+          <h2 className="text-md">Wybierz, czy twój zbiornik ma być mobilny, czy stacjonarny</h2>
+          <div className="my-4 flex gap-4">
+            <input type="button" name="Mobilnosc" onClick={() => setSelectedMobility(null)} className="p-4 w-1/2 text-md rounded border-2 border-sky-600 hover:bg-sky-700 hover:text-white transition cursor-pointer" value="Stacjonarne"/> 
+            <input type="button" name="Mobilnosc" onClick={() => setSelectedMobility("mobilne")} className=" p-4 w-1/2 text-md rounded border-2 border-sky-600 hover:bg-sky-700 hover:text-white transition cursor-pointer" value="Mobilne" />
+          </div>
+          <hr />
+          <select className="my-4 w-full p-2 border-gray-400 border-2 rounded" onChange={(e) => setSelectedCategory(e.target.value)}>
+            <option disabled selected>Wybierz, jaki typ zbiornika chcesz</option>
+            <option>Zbiorniki na olej napędowy (diesel)</option>
+            <option>Zbiorniki na AdBlue</option>
+          </select>
+          
+        </div>
         <div
           className="grid gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-items-center">
-          {produkty.filter(p => p.subcategory === category).map((prod, index) => (
+          {filteredProducts.map((prod, index) => (
               <button
                 key={prod.code ?? `${index}`}
                 className="
-                        w-full max-w-[200px]
+                        w-full max-w-[150px]
                         p-4 rounded border-2 border-sky-600 hover:bg-sky-700 
                         hover:text-white transition cursor-pointer
+                  "
+              onClick={() => setSelectedProduct(prod)}
+            >
+              <Image src={"https://jfcpolska.pl" + (prod.images?.[0] ?? "/placeholder.png")} width={100} height={100} quality={25} alt="" className="mx-auto" />
 
-                      "
-                onClick={() => setSelectedProduct(prod)}
-              >
-                <Image src={"https://jfcpolska.pl" + (prod.images?.[0] ?? "/placeholder.png")} width={100} height={100} quality={25} alt="" className="mx-auto" />
-
-                <h2 className="text-lg font-bold text-center mb-2">
-                  {prod.code}
-                </h2>
-              </button>
+              <h2 className="text-lg font-bold text-center mb-2">
+                {prod.code}
+              </h2>
+            </button>
           ))}
-          
         </div>
       </div>
 
@@ -99,12 +108,11 @@ export default function Home() {
                 </div>
               </div>
               <div className="col-span-2 row-span-3 col-start-3">
-                <img
-                  src="https://placehold.co/200x200"
-                  className="mx-auto mb-6 w-full max-w-[250px] object-contain"
-                />
+                <Image src={"https://jfcpolska.pl" + (selectedProduct.images[0])} width={400} height={400} quality={25} alt="" className="mx-auto"  />
               </div>
-              <div className="col-span-2 row-span-2 col-start-3 row-start-4">3</div>
+              <div className="col-span-2 row-span-2 col-start-3 row-start-4">
+                {selectedProduct.description}
+              </div>
             </div>
           </div>
         )

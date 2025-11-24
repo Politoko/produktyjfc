@@ -4,16 +4,36 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(70%);
   }
+
   to {
     transform: translateY(50%);
-}
-to{
+  }
+
+  to {
     transform: translateY(0%);
   }
 }
+
 .animate-slide-up {
-  animation: slide-up 0.10s ease-out;
+  animation: slide-up 2s ease-out;
 }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 350ms ease-out forwards;
+}
+
+/* modal overlay fade */
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-overlay-fade { animation: overlayFade 250ms ease-out forwards; }
+
