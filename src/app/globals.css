@@ -19,7 +19,7 @@
 }
 
 .animate-slide-up {
-  animation: slide-up 2s ease-out;
+  animation: slide-up 1.5s ease-out;
 }
 
 @keyframes fadeUp {
