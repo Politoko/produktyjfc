@@ -2,7 +2,10 @@
 
 import { useState, useMemo, useEffect } from "react";
 import produkty from "@/components/produkty.json";
-import Image from 'next/image'
+import Image from 'next/image';
+import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
+import autoTable from "jspdf-autotable";
 
 export default function Home() {
 
@@ -10,6 +13,19 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedMobility, setSelectedMobility] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [checkedOptions, setCheckedOptions] = useState<boolean[]>([]);
+
+  const loadFontAsBase64 = async (url: string) => {
+    const res = await fetch(url);
+    const buffer = await res.arrayBuffer();
+    return btoa(
+      new Uint8Array(buffer).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+  };
+
 
   useEffect(() => {
     setIsClient(true);
@@ -64,6 +80,118 @@ export default function Home() {
     return typeof p.subcategory === 'string' && filteredSubcategories.includes(p.subcategory) && isSubcategoryMatch && isMobilityMatch;
   });
 
+  const handleCheckboxChange = (idx: number) => {
+    const updated = [...checkedOptions];
+    updated[idx] = !updated[idx];
+    setCheckedOptions(updated);
+  };
+
+  const generatePDF = async (): Promise<void> => {
+    if (!selectedProduct) return;
+
+    const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+
+    const regularBase64 = await loadFontAsBase64("/fonts/Roboto-Regular.ttf");
+    const boldBase64 = await loadFontAsBase64("/fonts/Roboto-Bold.ttf");
+
+    doc.addFileToVFS("Roboto-Regular.ttf", regularBase64);
+    doc.addFileToVFS("Roboto-Bold.ttf", boldBase64);
+
+    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+
+    doc.setFont("Roboto", "normal");
+
+    doc.setFontSize(18);
+    doc.text(selectedProduct.name, 105, 15, { align: "center" });
+
+    const specsRows: [string, string][] = [
+      ["Pojemność", String(selectedProduct.capacity ?? "-")],
+      ["Wymiary", String(selectedProduct.dimensions ?? "-")]
+    ];
+
+    autoTable(doc, {
+      head: [["Specyfikacja", "Wartość"]],
+      body: specsRows,
+      startY: 25,
+      styles: {
+        font: "Roboto",
+        fontSize: 11,
+        cellPadding: 2,
+        fontStyle: "normal",
+      },
+      headStyles: {
+        fillColor: [0, 122, 204],
+        textColor: 255,
+        font: "Roboto",
+        fontStyle: "bold",
+        cellPadding: 3,
+      },
+      bodyStyles: {
+        font: "Roboto",
+        fontStyle: "normal",
+      },
+      columnStyles: {
+        0: { font: "Roboto", fontStyle: "normal" },
+        1: { font: "Roboto", fontStyle: "normal" },
+      },
+    });
+
+    const startY = (doc as any).lastAutoTable?.finalY + 10 ?? 50;
+
+    const equipment: string[] = Array.isArray(selectedProduct.equipment) ? selectedProduct.equipment : [];
+    const extra: string[] = Array.isArray(selectedProduct.extraEquipment) ? selectedProduct.extraEquipment : [];
+
+    const tableRows: [string, string][] = [];
+    equipment.forEach(item => tableRows.push([String(item ?? ""), "Standard"]));
+    extra.forEach((item, i) => { if (checkedOptions[i]) tableRows.push([String(item ?? ""), "Dodatkowe"]); });
+    if (tableRows.length === 0) tableRows.push(["Brak wybranego wyposażenia", "-"]);
+
+    autoTable(doc, {
+      head: [["Wyposażenie", "Typ"]],
+      body: tableRows,
+      startY: startY,
+      styles: {
+        font: "Roboto",
+        fontSize: 11,
+        cellPadding: 2,
+        fontStyle: "normal",
+      },
+      headStyles: {
+        fillColor: [0, 122, 204],
+        textColor: 255,
+        font: "Roboto",
+        fontStyle: "bold",
+        cellPadding: 3,
+      },
+      bodyStyles: {
+        font: "Roboto",
+        fontStyle: "normal",
+      },
+      columnStyles: {
+        0: { font: "Roboto", fontStyle: "normal" },
+        1: { font: "Roboto", fontStyle: "normal" },
+      },
+    });
+
+    const lastY = (doc as any).lastAutoTable?.finalY ?? startY + 50;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(14);
+    const text = "Kod QR do produktu:";
+    const textWidth = doc.getTextWidth(text);
+    doc.text(text, (pageWidth - textWidth) / 2, lastY + 15);
+
+    const qrText = `https://jfcpolska.pl/dzial/zbiorniki-i-dystrybutory/produkt/${selectedProduct.id}`;
+    const qrDataURL = await QRCode.toDataURL(qrText);
+    const qrSize = 40; // rozmiar QR w mm
+    doc.addImage(qrDataURL, "PNG", (pageWidth - qrSize) / 2, lastY + 20, qrSize, qrSize);
+
+    doc.save(`${selectedProduct.name}.pdf`);
+  };
+
+
   return (
     <div className="min-h-screen bg-linear-to-b from-white via-sky-300 to-sky-800 flex flex-col justify-center">
       <div className="max-w-7xl w-full min-h-170 bg-white px-10 pt-5 pb-10 relative mx-auto flex">
@@ -92,8 +220,8 @@ export default function Home() {
             <option>Zbiorniki na AdBlue</option>
           </select>
           <hr />
-          <h2 className="text-lg text-center">Wybierz rozmiar swojego zbiornika</h2>
-          <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 justify-items-center my-4">
+          <h2 className="text-lg text-center" hidden={!selectedCategory}>Wybierz rozmiar swojego zbiornika</h2>
+          <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 justify-items-center my-4 overflow-y-auto" hidden={!selectedCategory}>
             {filteredProducts.map((prod, index) => (
               <button
                 key={prod.code ?? `${index}`}
@@ -130,7 +258,7 @@ export default function Home() {
             <button
               aria-label="Close"
               className=" bg-red-500 text-white text-lg z-50 hover:bg-red-600 h-13 w-13 absolute right-0"
-              onClick={() => setSelectedProduct(null)}
+              onClick={() => { setSelectedProduct(null); setCheckedOptions([]) }}
             >
               &times;
             </button>
@@ -148,11 +276,11 @@ export default function Home() {
                     <>
                       <h2 className="text-xl font-semibold text-center border-y-2 border-gray-400/70 py-2 rounded-md">Wyposażenie standardowe</h2>
                       {selectedProduct.equipment && selectedProduct.equipment.length > 0 && (
-                          <ul className="list-disc list-inside text-sm text-gray-700 mt-1 overflow-y-auto max-h-30">
-                            {selectedProduct.equipment.map((eq: string, i: number) => (
-                              <li key={`eq-${i}`}>{eq}</li>
-                            ))}
-                          </ul>
+                        <ul className="list-disc list-inside text-sm text-gray-700 mt-1 overflow-y-auto max-h-30">
+                          {selectedProduct.equipment.map((eq: string, i: number) => (
+                            <li key={`eq-${i}`}>{eq}</li>
+                          ))}
+                        </ul>
                       )}
 
                       <h2 className="text-xl font-semibold text-center border-y-2 border-gray-400/70 py-2 rounded-md">Dodatkowe opcje</h2>
@@ -160,7 +288,7 @@ export default function Home() {
                         <div className="flex flex-col gap-2 overflow-y-auto max-h-40 border border-gray-400 rounded-md p-1">
                           {selectedProduct.extraEquipment.map((option: string, idx: number) => (
                             <label key={`extra-${idx}`} className="flex items-center gap-3">
-                              <input type="checkbox" className="w-5 h-5" />
+                              <input type="checkbox" className="w-5 h-5" onChange={() => handleCheckboxChange(idx)} />
                               <span className="text-sm">{option}</span>
                             </label>
                           ))}
@@ -171,7 +299,7 @@ export default function Home() {
                     <p className="text-center text-gray-500">Brak dodatkowych opcji</p>
                   )}
 
-                  <button className="w-full p-2 mt-3 rounded-md border-2 border-green-700 bg-green-500  hover:text-white hover:bg-green-600 transition cursor-pointer">Generuj</button>
+                  <button onClick={generatePDF} className="w-full p-2 mt-3 rounded-md border-2 border-green-700 bg-green-500  hover:text-white hover:bg-green-600 transition cursor-pointer">Generuj</button>
                 </div>
               </div>
 

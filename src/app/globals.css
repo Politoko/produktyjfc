@@ -30,7 +30,6 @@
   animation: fadeUp 350ms ease-out forwards;
 }
 
-/* modal overlay fade */
 @keyframes overlayFade {
   from { opacity: 0; }
   to   { opacity: 1; }
